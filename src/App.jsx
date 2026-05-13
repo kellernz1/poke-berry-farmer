@@ -211,7 +211,7 @@ export default function App() {
             const rand = Math.random();
             if (rand < (0.01 + pikachuBonus)) {
                 newRocket = { active: true, timeLeft: 10, x: Math.floor(Math.random() * 80) + 10, y: Math.floor(Math.random() * 80) + 10 };
-            } else if (rand < 0.03) {
+            } else if (rand < 0.02) {
                 const poke = WILD_ENCOUNTERS[Math.floor(Math.random() * WILD_ENCOUNTERS.length)];
                 newWild = { active: true, ...poke, timeLeft: 15, x: Math.floor(Math.random() * 80) + 10, y: Math.floor(Math.random() * 80) + 10 }; 
             }
