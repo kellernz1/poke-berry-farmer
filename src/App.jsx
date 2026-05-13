@@ -133,7 +133,7 @@ export default function App() {
         };
       } catch (error) {
         console.error("Save file corrupted, starting fresh:", error);
-        localStorage.removeItem('pokeBerrySave');
+        localStorage.removeItem('pokeBerrySave'); // Limpa o dado quebrado
         return INITIAL_STATE;
       }
     }
@@ -167,7 +167,7 @@ export default function App() {
 
         const updatedBeds = prev.beds.map((bed, index) => {
           if (index >= prev.unlockedBeds || bed.isEmpty) return bed;
-          
+
           const masteryLvl = getMasteryLevel(prev.stats[bed.berryId]);
           const masteryTimeMult = 1 - Math.min(masteryLvl * 0.01, 0.50);
           const maxTime = BERRIES[bed.berryId].growthTime * waterMult * masteryTimeMult;
@@ -179,7 +179,7 @@ export default function App() {
              if (Math.random() < fertMult) yieldAmt *= 2;
              if (Math.random() < collStage.bonusChance) yieldAmt *= 2;
              const finalBerry = checkMutation(prev.beds, index, bed.berryId, eeveeBonus);
-             
+
              newInventory[finalBerry] = (newInventory[finalBerry] || 0) + yieldAmt;
              newStats[finalBerry] = (newStats[finalBerry] || 0) + (yieldAmt * machoMult);
              newQuests = updateQuestsProgress(newQuests, 'harvest', finalBerry, yieldAmt);
@@ -218,31 +218,37 @@ export default function App() {
             }
         }
         
-        // AUTO-SELL LOGIC
+        // ---> LÓGICA DO NOVO AJUDANTE (AUTO-SELL) <---
         const sellerLvl = prev.helpers?.seller || 0;
         if (sellerLvl > 0) {
             const sellerStage = getHelperStage('seller', sellerLvl);
+            // Quantidade vendida por segundo = Level do Ajudante * Multiplicador da Evolução
             const sellLimit = sellerLvl * sellerStage.mult; 
-            
+
+            // Puxa todos os multiplicadores globais de preço
             const regionBonus = 1 + (prev.regionIndex || 0); 
             const amuletMult = prev.tools?.amuletCoin ? 1.5 : 1.0;
             const achievBonus = 1 + (Object.keys(prev.achievements || {}).length * 0.05); 
             const mewBonus = prev.pasture?.mew > 0 ? 1.10 : 1.0;
 
+            // Varre o inventário e vende até o limite do level dele
             Object.keys(BERRIES).forEach(berryId => {
                 const qtyInInv = newInventory[berryId] || 0;
                 if (qtyInInv > 0) {
                     const toSell = Math.min(qtyInInv, sellLimit);
                     const dexBonus = 1 + (Math.floor((newStats[berryId] || 0) / 10) * 0.01);
                     const unitValue = Math.floor(BERRIES[berryId].value * regionBonus * dexBonus * amuletMult * achievBonus * mewBonus);
-                    
+
                     newMoney += (toSell * unitValue);
                     newInventory[berryId] -= toSell;
+
+                    // Avança as quests de venda automaticamente também!
                     newQuests = updateQuestsProgress(newQuests, 'sell', berryId, toSell);
                 }
             });
         }
 
+        // ---> FIM DA LÓGICA DO AUTO-SELL <---
         const stateForCheck = { ...prev, money: newMoney, stats: newStats };
         ACHIEVEMENTS.forEach(ach => {
             if (!newAchievements[ach.id] && ach.req(stateForCheck)) newAchievements[ach.id] = true;
@@ -290,36 +296,34 @@ export default function App() {
     setGameState(prev => {
       const newBeds = [...prev.beds];
       const bed = newBeds[index];
-      if (bed.isEmpty) return prev;
-      
+
       const pidgeyBonus = prev.pasture?.pidgey > 0 ? 0.95 : 1.0;
       const waterMult = (prev.helpers?.water > 0 ? getHelperStage('water', prev.helpers.water).mult : 1.0) * (prev.tools.wailmerPail ? 0.9 : 1.0) * pidgeyBonus;
       const masteryLvl = getMasteryLevel(prev.stats[bed.berryId]);
       const masteryTimeMult = 1 - Math.min(masteryLvl * 0.01, 0.50);
       const maxTime = BERRIES[bed.berryId].growthTime * waterMult * masteryTimeMult;
 
-      if (bed.progress >= maxTime) {
+      if (!bed.isEmpty && bed.progress >= maxTime) {
         let yieldAmt = bed.isShiny ? 10 : 1;
         if (prev.helpers?.fertilizer > 0 && Math.random() < getHelperStage('fertilizer', prev.helpers.fertilizer).mult) yieldAmt *= 2;
-        
+
         const finalBerry = checkMutation(prev.beds, index, bed.berryId, prev.pasture?.eevee > 0);
         if (e) triggerFloatingText(`+${yieldAmt} ${BERRIES[finalBerry].name}`, e.clientX, e.clientY, bed.isShiny ? 'text-yellow-400' : 'text-green-400');
 
         const newInventory = { ...prev.inventory };
         newInventory[finalBerry] = (newInventory[finalBerry] || 0) + yieldAmt;
-        const newStats = { ...prev.stats, [finalBerry]: (prev.stats[finalBerry] || 0) + (yieldAmt * (prev.tools.machoBrace ? 2 : 1)) };
         let newQuests = updateQuestsProgress(prev.quests, 'harvest', finalBerry, yieldAmt);
-        
+
         if (prev.helpers?.planter > 0 && Math.random() < getHelperStage('planter', prev.helpers.planter).chance) {
-          const newMasteryLvl = getMasteryLevel(newStats[bed.berryId]);
+          const newMasteryLvl = getMasteryLevel(prev.stats[bed.berryId]);
           let startProgress = 0;
           if (newMasteryLvl >= 50 && Math.random() < 0.05) startProgress = 999999;
           newBeds[index] = { isEmpty: false, berryId: bed.berryId, progress: startProgress, isShiny: Math.random() < 0.05 };
         } else {
           newBeds[index] = { isEmpty: true, berryId: null, progress: 0, isShiny: false };
         }
-        
-        return { ...prev, beds: newBeds, inventory: newInventory, stats: newStats, quests: newQuests };
+
+        return { ...prev, beds: newBeds, inventory: newInventory, quests: newQuests };
       }
       return prev;
     });
@@ -334,7 +338,7 @@ export default function App() {
         const amuletMult = prev.tools.amuletCoin ? 1.5 : 1.0;
         const achievBonus = 1 + (Object.keys(prev.achievements || {}).length * 0.05); 
         const mewBonus = prev.pasture?.mew > 0 ? 1.10 : 1.0;
-        
+
         const earnings = Math.floor(qty * BERRIES[berryId].value * regionBonus * dexBonus * amuletMult * achievBonus * mewBonus);
         if (e) triggerFloatingText(`+₽${earnings}`, e.clientX, e.clientY, 'text-yellow-300');
 
@@ -347,10 +351,11 @@ export default function App() {
   const catchWildPokemon = (e) => {
     setGameState(prev => {
        if (!prev.wildPokemon?.active) return prev;
+
        let newMoney = prev.money;
        let newInv = { ...prev.inventory };
        const wildId = prev.wildPokemon.id;
-       
+
        if (prev.wildPokemon.type === 'money') {
          newMoney += prev.wildPokemon.amount;
          triggerFloatingText(`+₽${prev.wildPokemon.amount}`, e.clientX, e.clientY, 'text-yellow-300');
@@ -359,7 +364,7 @@ export default function App() {
          newInv[prev.wildPokemon.berryId] = (newInv[prev.wildPokemon.berryId] || 0) + prev.wildPokemon.amount;
          triggerFloatingText(`+${prev.wildPokemon.amount} ${BERRIES[prev.wildPokemon.berryId].name}`, e.clientX, e.clientY, 'text-green-300');
        }
-       
+
        const newPasture = { ...prev.pasture, [wildId]: (prev.pasture[wildId] || 0) + 1 };
        return { ...prev, money: newMoney, inventory: newInv, wildPokemon: { active: false }, pasture: newPasture, quests: updateQuestsProgress(prev.quests, 'wild', 'any', 1) };
     });
@@ -367,11 +372,11 @@ export default function App() {
 
   const defeatRocket = (e) => {
       setGameState(prev => {
-          if (!prev.rocketEvent?.active) return prev;
-          const reward = 500 * (1 + prev.regionIndex); 
-          triggerFloatingText(`Derrotado! +₽${reward}`, e.clientX, e.clientY, 'text-blue-300');
-          const newStats = { ...prev.stats, rocketsDefeated: (prev.stats.rocketsDefeated || 0) + 1 };
-          return { ...prev, money: prev.money + reward, stats: newStats, rocketEvent: { active: false } };
+         if (!prev.rocketEvent?.active) return prev;
+         const reward = 500 * (1 + prev.regionIndex); 
+         triggerFloatingText(`Derrotado! +₽${reward}`, e.clientX, e.clientY, 'text-blue-300');
+         const newStats = { ...prev.stats, rocketsDefeated: (prev.stats.rocketsDefeated || 0) + 1 };
+         return { ...prev, money: prev.money + reward, stats: newStats, rocketEvent: { active: false } };
       });
   };
 
@@ -440,50 +445,50 @@ export default function App() {
   const nextRegionName = REGIONS[currentRegion + 1] || "Fim";
 
   return (
-    <div className="min-h-screen p-8 flex flex-col md:flex-row gap-8 text-[10px] md:text-xs text-gba-dark relative bg-gray-100">
+    <div className="min-h-screen p-8 flex flex-col md:flex-row gap-8 text-[10px] md:text-xs text-gba-dark relative">
       {floatingTexts.map(ft => (
         <div key={ft.id} className={`fixed font-bold text-sm ${ft.color} floating-text pointer-events-none z-50`} style={{ left: ft.x, top: ft.y }}>
           {ft.text}
         </div>
       ))}
 
-      {/* COLUNA ESQUERDA */}
+      {/* COLUNA ESQUERDA (FAZENDA PRINCIPAL) */}
       <div className="flex-1 space-y-6">
-        <header className="gba-dialog-blue p-4 shadow-lg flex justify-between items-center text-white rounded-lg">
+        <header className="gba-dialog-blue p-4 shadow-lg flex justify-between items-center">
           <div>
-            <h1 className="text-xl md:text-2xl mb-2 drop-shadow-md font-bold">Poké-Berry Farmer</h1>
-            <p className="text-lg">PokéDollars: ₽ {gameState.money.toLocaleString()}</p>
+            <h1 className="text-xl md:text-2xl mb-2 drop-shadow-md">Poké-Berry Farmer</h1>
+            <p className="text-lg">PokéDollars: ₽ {gameState.money}</p>
           </div>
           <div className="text-right">
-            <p className="text-yellow-300 drop-shadow-md text-lg font-bold">📍 {REGIONS[currentRegion]}</p>
+            <p className="text-yellow-300 drop-shadow-md text-lg">📍 {REGIONS[currentRegion]}</p>
             <p className="text-white text-[8px]">(Multiplicador: x{currentRegion + 1})</p>
           </div>
         </header>
 
         {gameState.money >= (prestigeCost * 0.8) && currentRegion < REGIONS.length - 1 && (
-          <div className="gba-dialog p-4 bg-yellow-100 text-center border-2 border-yellow-500 rounded-lg animate-pulse">
-            <h2 className="text-yellow-800 mb-2 font-bold">A Elite 4 de {REGIONS[currentRegion]} desafia você!</h2>
-            <button onClick={handlePrestige} disabled={gameState.money < prestigeCost} className="bg-yellow-500 text-white px-4 py-2 rounded shadow-md hover:bg-yellow-600 disabled:opacity-50 cursor-pointer transition-all">
-              Viajar para {nextRegionName} (Custa ₽ {prestigeCost.toLocaleString()})
+          <div className="gba-dialog p-4 bg-yellow-100/90 text-center border-yellow-500 animate-pulse">
+            <h2 className="text-yellow-800 mb-2">A Elite 4 de {REGIONS[currentRegion]} desafia você!</h2>
+            <button onClick={handlePrestige} disabled={gameState.money < prestigeCost} className="bg-yellow-500 text-white px-4 py-2 rounded shadow border-b-4 border-yellow-700 active:translate-y-[2px] active:border-b-0 disabled:opacity-50 cursor-pointer">
+              Viajar para {nextRegionName} (Custa ₽ {prestigeCost})
             </button>
           </div>
         )}
 
-        <section className={`relative gba-dialog p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-amber-50 rounded-lg border-4 border-gba-dark transition-colors ${gameState.rocketEvent?.active ? 'ring-4 ring-red-500 bg-red-50' : ''}`}>
+        <section className={`relative gba-dialog p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-[url('https://www.transparenttextures.com/patterns/dirt.png')] bg-amber-900/10 transition-colors ${gameState.rocketEvent?.active ? 'ring-4 ring-red-500 ring-inset bg-red-900/20' : ''}`}>
           {gameState.wildPokemon?.active && (
-            <div onClick={catchWildPokemon} className="absolute z-10 cursor-pointer animate-bounce flex flex-col items-center" style={{ top: `${gameState.wildPokemon.y}%`, left: `${gameState.wildPokemon.x}%`, transform: 'translate(-50%, -50%)' }}>
+            <div onClick={catchWildPokemon} className="absolute z-10 cursor-pointer animate-bounce flex flex-col items-center p-2 rounded-full hover:bg-white/50 transition-colors" style={{ top: `${gameState.wildPokemon.y}%`, left: `${gameState.wildPokemon.x}%`, transform: 'translate(-50%, -50%)' }}>
               <img src={gameState.wildPokemon.sprite} alt="Wild" className="w-16 h-16 drop-shadow-lg" style={{ imageRendering: 'pixelated' }} />
-              <span className="bg-white border-2 border-gba-dark text-[10px] px-2 rounded-full text-blue-600 font-bold shadow-sm">!</span>
+              <span className="bg-white border-2 border-gba-dark text-[8px] px-1 rounded shadow text-blue-600 font-bold">!</span>
             </div>
           )}
 
           {gameState.rocketEvent?.active && (
-            <div onClick={defeatRocket} className="absolute z-20 cursor-pointer animate-pulse flex flex-col items-center" style={{ top: `${gameState.rocketEvent.y}%`, left: `${gameState.rocketEvent.x}%`, transform: 'translate(-50%, -50%)' }}>
-               <div className="relative">
+            <div onClick={defeatRocket} className="absolute z-20 cursor-pointer animate-pulse flex flex-col items-center p-2 rounded-full hover:bg-red-500/50 transition-colors" style={{ top: `${gameState.rocketEvent.y}%`, left: `${gameState.rocketEvent.x}%`, transform: 'translate(-50%, -50%)' }}>
+              <div className="relative">
                  <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/109.png" alt="Rocket" className="w-20 h-20 drop-shadow-lg" style={{ imageRendering: 'pixelated' }} />
-                 <span className="absolute top-0 right-0 text-red-600 text-2xl font-black drop-shadow-md">R</span>
-               </div>
-               <span className="bg-black text-white text-[10px] px-2 py-1 rounded border-2 border-red-600 font-bold mt-1">DERROTAR! ({gameState.rocketEvent.timeLeft}s)</span>
+                 <span className="absolute top-0 right-0 text-red-600 text-xl font-bold drop-shadow-[0_2px_2px_rgba(255,255,255,1)]">R</span>
+              </div>
+              <span className="bg-black border-2 border-red-600 text-[10px] text-white px-2 rounded shadow font-bold mt-1">DERROTAR! ({gameState.rocketEvent.timeLeft}s)</span>
             </div>
           )}
 
@@ -493,9 +498,9 @@ export default function App() {
                if (gameState.unlockedBeds >= 12) return null; 
                const landCost = 500 * Math.pow(2, gameState.unlockedBeds - 2);
                return (
-                 <div key={i} onClick={buyLand} className="h-32 border-4 border-dashed border-yellow-600 bg-yellow-50 hover:bg-yellow-100 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all active:scale-95">
-                   <span className="text-yellow-800 font-bold mb-1">Comprar Lote</span>
-                   <span className="text-yellow-700 font-bold">₽ {landCost.toLocaleString()}</span>
+                 <div key={i} onClick={buyLand} className="h-32 border-4 border-dashed border-yellow-600 bg-yellow-100/80 hover:bg-yellow-200 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-transform active:scale-95 z-0">
+                   <span className="text-yellow-800 font-bold mb-2">Comprar Lote</span>
+                   <span className="text-yellow-600 bg-white px-2 py-1 border border-yellow-600 rounded">₽ {landCost}</span>
                  </div>
                );
              }
@@ -503,32 +508,35 @@ export default function App() {
              const berryInfo = bed.berryId ? BERRIES[bed.berryId] : null;
              const pidgeyBonus = gameState.pasture?.pidgey > 0 ? 0.95 : 1.0;
              const waterMult = (gameState.helpers?.water > 0 ? getHelperStage('water', gameState.helpers.water).mult : 1.0) * (gameState.tools.wailmerPail ? 0.9 : 1.0) * pidgeyBonus;
+
              const masteryLvl = getMasteryLevel(gameState.stats?.[bed.berryId]);
              const masteryTimeMult = 1 - Math.min(masteryLvl * 0.01, 0.50);
              const maxTime = berryInfo ? berryInfo.growthTime * waterMult * masteryTimeMult : 0;
+
              const isReady = bed.progress >= maxTime;
              const progressPercent = berryInfo ? Math.min((bed.progress / maxTime) * 100, 100) : 0;
-             
+
              let barColor = 'bg-red-500';
              if (progressPercent >= 25) barColor = 'bg-yellow-400';
              if (progressPercent >= 75) barColor = 'bg-green-500';
 
-             const shinyStyle = bed.isShiny ? { filter: 'drop-shadow(0 0 8px gold) brightness(1.1) saturate(1.5)' } : {};
+             const shinyStyle = bed.isShiny ? { filter: 'drop-shadow(0 0 10px gold) brightness(1.2) sepia(1) hue-rotate(-50deg) saturate(3)' } : {};
 
              return (
-               <div key={i} onClick={(e) => bed.isEmpty ? plantBerry(i, e) : harvestBerry(i, e)} className={`h-32 border-4 ${bed.isEmpty ? 'border-dashed border-gray-300 hover:bg-gray-50' : 'border-gba-dark bg-white'} rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all active:scale-95 relative shadow-sm`}>
+               <div key={i} onClick={(e) => bed.isEmpty ? plantBerry(i, e) : harvestBerry(i, e)} className={`h-32 border-4 ${bed.isEmpty ? 'border-dashed border-gba-dark/50 hover:bg-gba-green/20' : 'border-gba-dark bg-white'} rounded-lg flex flex-col items-center justify-center cursor-pointer transition-transform active:scale-95 relative z-0`}>
                  {bed.isEmpty ? (
-                   <span className="opacity-40 text-center font-bold">PLANTAR</span>
+                   <span className="opacity-50 text-center">Clique<br/>Plantar</span>
                  ) : (
                    <>
-                     {bed.isShiny && <span className="absolute top-1 text-[8px] text-yellow-600 font-black animate-pulse uppercase">✨ Shiny</span>}
-                     <img src={berryInfo.sprite} alt={berryInfo.name} style={{ imageRendering: 'pixelated', ...shinyStyle }} className={`w-12 h-12 transition-all ${isReady ? 'animate-bounce scale-110' : 'opacity-70 scale-90'}`} />
+                     {bed.isShiny && <span className="absolute top-1 text-[8px] text-yellow-500 font-bold animate-pulse z-10">✨ SHINY</span>}
+                     <img src={berryInfo.sprite} alt={berryInfo.name} style={{ imageRendering: 'pixelated', ...shinyStyle }} className={`w-12 h-12 ${isReady ? 'animate-bounce drop-shadow-md scale-125' : 'opacity-60 scale-75'}`} />
+
                      {!isReady && (
-                       <div className="w-10/12 bg-gray-200 mt-2 h-3 rounded-full overflow-hidden border border-gray-300">
-                         <div className={`${barColor} h-full transition-all duration-1000 ease-linear`} style={{ width: `${progressPercent}%` }}></div>
+                       <div className="w-10/12 hp-bar-container mt-2 h-4 relative overflow-hidden">
+                         <div className={`${barColor} h-full transition-all duration-1000 ease-linear rounded-sm`} style={{ width: `${progressPercent}%` }}></div>
                        </div>
                      )}
-                     {isReady && <span className="mt-2 text-green-600 font-black text-[10px] animate-pulse">COLHER!</span>}
+                     {isReady && <span className="mt-2 text-green-600 animate-pulse font-bold">Pronto!</span>}
                    </>
                  )}
                </div>
@@ -536,58 +544,62 @@ export default function App() {
           })}
         </section>
 
-        <section className="gba-dialog p-4 flex justify-between items-center bg-white rounded-lg border-2 border-gba-dark">
-          <div className="flex items-center gap-3">
-            <span className="font-bold">Semente:</span>
-            <div className="flex items-center border-2 border-gba-dark rounded px-2 bg-gray-50">
-              <img src={BERRIES[selectedSeed].sprite} alt="seed" className="w-6 h-6" style={{ imageRendering: 'pixelated' }}/>
-              <select className="p-2 outline-none bg-transparent cursor-pointer font-bold" value={selectedSeed} onChange={(e) => setSelectedSeed(e.target.value)}>
+        <section className="gba-dialog p-4 flex justify-between items-center bg-white/90">
+          <div className="flex items-center gap-2">
+            <h2 className="underline">Semente:</h2>
+            <div className="flex items-center border-2 border-gba-dark bg-white">
+              <img src={BERRIES[selectedSeed].sprite} alt="seed" className="w-6 h-6 ml-2" style={{ imageRendering: 'pixelated' }}/>
+              <select className="p-2 outline-none bg-transparent cursor-pointer" value={selectedSeed} onChange={(e) => setSelectedSeed(e.target.value)}>
                 {Object.values(BERRIES).map(b => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
             </div>
           </div>
-          <button onClick={handleResetSave} className="text-red-500 font-bold hover:bg-red-50 px-3 py-1 rounded transition-colors">Resetar Save</button>
+          <button onClick={handleResetSave} className="text-red-600 font-bold border-2 border-transparent hover:border-red-600 bg-red-100 hover:bg-red-200 px-2 py-1 rounded transition-colors cursor-pointer">Resetar Save</button>
         </section>
       </div>
 
-      {/* COLUNA DIREITA */}
-      <div className="w-full md:w-96 flex flex-col gap-4">
-        <div className="flex flex-wrap gap-1 bg-gba-dark p-1 rounded-lg">
+      {/* COLUNA DIREITA (MENU DE ABAS) */}
+      <div className="w-full md:w-96 flex flex-col h-full">
+        
+        {/* BARRA DE NAVEGAÇÃO DAS ABAS */}
+        <div className="flex flex-wrap gap-1 mb-4 bg-gba-dark p-1 rounded-lg shadow-lg">
           {[
-            { id: 'loja', label: '📦 Venda' },
+            { id: 'loja', label: '📦 Loja' },
             { id: 'ajudantes', label: '🐾 Ajudantes' },
-            { id: 'itens', label: '🎒 Mochila' },
-            { id: 'missoes', label: '📋 Quests' },
-            { id: 'progresso', label: '🏆 Dex' }
+            { id: 'itens', label: '🎒 Inventário' },
+            { id: 'missoes', label: '📋 Missões' },
+            { id: 'progresso', label: '🏆 Progresso' }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-2 text-[9px] font-bold rounded transition-all ${activeTab === tab.id ? 'bg-gba-green text-white shadow-inner' : 'bg-white text-gba-dark hover:bg-gray-100'}`}
+              className={`flex-1 py-3 text-[9px] font-bold rounded cursor-pointer transition-colors ${activeTab === tab.id ? 'bg-gba-green text-white shadow-inner border-2 border-transparent' : 'bg-white text-gba-dark border-2 border-b-4 border-gray-300 hover:bg-gray-100 active:translate-y-[2px] active:border-b-2'}`}
             >
               {tab.label}
             </button>
           ))}
         </div>
-
-        <div className="space-y-4">
+        
+        {/* CONTEÚDO DINÂMICO DAS ABAS */}
+        <div className="space-y-6">
           {activeTab === 'loja' && (
-            <section className="gba-dialog p-4 bg-white rounded-lg border-2 border-gba-dark">
-              <h2 className="text-center font-bold border-b-2 mb-3 pb-1 uppercase">Mercado de Berries</h2>
-              <div className="space-y-2">
+            <section className="gba-dialog p-4 bg-white/90 animate-[fadeIn_0.3s_ease-in-out]">
+              <h2 className="text-lg mb-4 text-center border-b-2 border-gba-dark pb-2">📦 Vender</h2>
+              <div className="space-y-3">
                 {Object.values(BERRIES).map(berry => {
                   const qty = gameState.inventory[berry.id] || 0;
                   const unitValue = Math.floor(berry.value * (1 + currentRegion) * (1 + (Math.floor((gameState.stats[berry.id] || 0) / 10) * 0.01)) * (gameState.tools.amuletCoin ? 1.5 : 1.0) * (1 + (Object.keys(gameState.achievements || {}).length * 0.05)) * (gameState.pasture?.mew > 0 ? 1.10 : 1.0));
+
                   return (
-                    <div key={berry.id} className="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-200">
-                      <div className="flex items-center gap-2">
+                    <div key={berry.id} className="flex justify-between items-center bg-gray-50 p-1 border border-gray-200 rounded">
+                      <div className="flex items-center gap-1">
                         <img src={berry.sprite} alt={berry.name} className="w-6 h-6" style={{ imageRendering: 'pixelated' }}/>
-                        <span className="font-bold">x{qty}</span>
+                        <span>x {qty}</span>
                       </div>
-                      <button onClick={(e) => sellBerries(berry.id, e)} disabled={qty === 0} className="bg-gba-green text-white px-3 py-1 rounded-md font-bold shadow-sm hover:bg-green-600 disabled:opacity-40 transition-all">
-                        ₽{(unitValue * qty).toLocaleString()}
+                      <button onClick={(e) => sellBerries(berry.id, e)} disabled={qty === 0} className="bg-gba-green text-white px-2 py-2 border-2 border-b-4 border-gba-dark active:border-b-2 active:translate-y-[2px] disabled:opacity-50 cursor-pointer">
+                        Vender (₽{unitValue * qty})
                       </button>
                     </div>
                   )
@@ -597,28 +609,30 @@ export default function App() {
           )}
 
           {activeTab === 'ajudantes' && (
-            <section className="gba-dialog p-4 bg-white rounded-lg border-2 border-gba-dark">
-              <h2 className="text-center font-bold border-b-2 mb-3 pb-1 uppercase">Equipe de Apoio</h2>
-              <div className="space-y-3">
+            <section className="gba-dialog p-4 bg-white/90 animate-[fadeIn_0.3s_ease-in-out]">
+              <h2 className="text-lg mb-4 text-center border-b-2 border-gba-dark pb-2">🐾 Ajudantes</h2>
+              <div className="space-y-4">
                 {Object.keys(HELPERS).map(helperId => {
                   const helperData = HELPERS[helperId];
                   const qtyOwned = gameState.helpers[helperId] || 0;
                   const cost = Math.floor(helperData.basePrice * Math.pow(1.15, qtyOwned));
                   const currentStage = getHelperStage(helperId, qtyOwned);
+                  const isEvolving = evolvingHelper === helperId;
+
                   return (
-                    <div key={helperId} className="border-2 border-gray-100 p-2 rounded-lg bg-gray-50">
-                      <div className="flex items-center gap-3 mb-2">
-                        <img src={currentStage.sprite} alt={currentStage.name} className={`w-12 h-12 bg-white rounded-full border border-gray-200 p-1 ${evolvingHelper === helperId ? 'animate-ping' : ''}`} style={{ imageRendering: 'pixelated' }}/>
+                    <div key={helperId} className="border-2 border-gba-dark p-2 rounded bg-gray-50 flex flex-col">
+                      <div className="flex items-center gap-2 mb-2">
+                        <img src={currentStage.sprite} alt={currentStage.name} className={`w-12 h-12 bg-gray-200 rounded-full border-2 border-gba-dark ${isEvolving ? 'evolve-anim' : ''}`} style={{ imageRendering: 'pixelated' }}/>
                         <div className="flex-1">
-                          <div className="flex justify-between items-center">
-                            <span className="font-black text-[10px]">{currentStage.name}</span>
-                            <span className="text-blue-600 font-bold">Lv.{qtyOwned}</span>
+                          <div className="flex justify-between">
+                            <span className="font-bold">{currentStage.name}</span>
+                            <span className="text-blue-600">Lvl {qtyOwned}</span>
                           </div>
-                          <p className="text-[8px] text-gray-500 leading-tight">{currentStage.effect}</p>
+                          <p className="text-[8px] text-gray-600">{currentStage.effect}</p>
                         </div>
                       </div>
-                      <button onClick={(e) => buyHelper(helperId, e)} disabled={gameState.money < cost} className="w-full bg-blue-500 text-white py-1 rounded font-bold shadow-sm hover:bg-blue-600 disabled:opacity-50 transition-all uppercase text-[9px]">
-                        Melhorar (₽{cost.toLocaleString()})
+                      <button onClick={(e) => buyHelper(helperId, e)} disabled={gameState.money < cost} className="w-full bg-blue-500 text-white px-2 py-2 border-2 border-b-4 border-gba-dark active:border-b-2 active:translate-y-[2px] disabled:opacity-50 cursor-pointer transition-all">
+                        UPGRADE (₽ {cost})
                       </button>
                     </div>
                   );
@@ -628,21 +642,23 @@ export default function App() {
           )}
 
           {activeTab === 'itens' && (
-            <div className="space-y-4">
-              <section className="gba-dialog p-4 bg-white rounded-lg border-2 border-orange-200">
-                <h2 className="text-center font-bold border-b-2 mb-3 pb-1 uppercase text-orange-700">Equipamentos</h2>
+            <>
+              <section className="gba-dialog p-4 bg-orange-50/90 animate-[fadeIn_0.3s_ease-in-out]">
+                <h2 className="text-lg mb-4 text-center border-b-2 border-gba-dark pb-2 text-orange-800">🎒 Itens Base</h2>
                 <div className="space-y-2">
                   {Object.keys(KEY_ITEMS).map(toolId => {
                     const item = KEY_ITEMS[toolId];
                     const isOwned = gameState.tools[toolId];
                     return (
-                      <div key={toolId} className={`p-2 rounded border-2 flex justify-between items-center ${isOwned ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-100'}`}>
-                          <span className="font-bold">{item.icon} {item.name}</span>
+                      <div key={toolId} className={`border-2 border-gba-dark p-2 rounded flex justify-between items-center ${isOwned ? 'bg-orange-200/50' : 'bg-white'}`}>
+                          <div className="flex flex-col">
+                            <span className="font-bold flex items-center gap-1">{item.icon} {item.name}</span>
+                          </div>
                           {isOwned ? (
-                            <span className="text-orange-600 font-black text-[9px]">OK</span>
+                            <span className="text-green-700 font-bold text-[10px]">Comprado</span>
                           ) : (
-                            <button onClick={(e) => buyTool(toolId, e)} disabled={gameState.money < item.price} className="bg-orange-500 text-white px-3 py-1 rounded font-bold text-[9px] hover:bg-orange-600 disabled:opacity-50">
-                              ₽{item.price.toLocaleString()}
+                            <button onClick={(e) => buyTool(toolId, e)} disabled={gameState.money < item.price} className="bg-orange-500 text-white px-2 py-1 border-b-2 border-gba-dark active:border-b-0 active:translate-y-[2px] disabled:opacity-50 cursor-pointer text-[9px]">
+                              ₽ {item.price}
                             </button>
                           )}
                       </div>
@@ -651,36 +667,37 @@ export default function App() {
                 </div>
               </section>
 
-              <section className="gba-dialog p-4 bg-green-50 rounded-lg border-2 border-green-200">
-                <h2 className="text-center font-bold border-b-2 mb-2 pb-1 uppercase text-green-700">Poké-Pasto</h2>
+              <section className="gba-dialog p-4 bg-green-50/90 border-green-600 animate-[fadeIn_0.3s_ease-in-out]">
+                <h2 className="text-lg mb-2 border-b-2 border-green-600 pb-1 text-green-800">🐾 Pasto de Colecionador</h2>
+                <p className="text-[8px] text-gray-600 mb-2 text-center">Capture Pokémon na fazenda para buffs!</p>
                 <div className="grid grid-cols-2 gap-2">
                     {WILD_ENCOUNTERS.map(poke => {
                       const isCaught = gameState.pasture?.[poke.id] > 0;
                       return (
-                          <div key={poke.id} className={`p-2 border rounded-lg flex flex-col items-center text-center ${isCaught ? 'bg-white border-green-200' : 'bg-gray-100 opacity-40 grayscale'}`}>
+                          <div key={poke.id} className={`p-1 border-2 rounded flex flex-col items-center text-center ${isCaught ? 'border-green-500 bg-white shadow-sm' : 'border-gray-300 bg-gray-100 opacity-60 grayscale'}`}>
                             <img src={poke.sprite} alt={poke.name} className="w-10 h-10" style={{ imageRendering: 'pixelated' }}/>
-                            <span className="font-bold text-[8px]">{isCaught ? poke.name : '???'}</span>
-                            {isCaught && <span className="text-[7px] text-blue-500 leading-tight mt-1">{poke.buffDesc}</span>}
+                            <span className="font-bold text-[8px] text-gba-dark">{isCaught ? poke.name : '???'}</span>
+                            {isCaught && <span className="text-[7px] text-blue-600 mt-1">{poke.buffDesc}</span>}
                           </div>
                       )
                     })}
                 </div>
               </section>
-            </div>
+            </>
           )}
 
           {activeTab === 'missoes' && (
-            <section className="gba-dialog p-4 bg-white rounded-lg border-2 border-blue-200">
-              <h2 className="text-center font-bold border-b-2 mb-3 pb-1 uppercase text-blue-700">Tarefas do Prof. Oak</h2>
-              <div className="space-y-3">
+            <section className="gba-dialog p-4 bg-white/90 animate-[fadeIn_0.3s_ease-in-out]">
+              <h2 className="text-lg mb-2 border-b-2 border-gba-dark pb-1 text-blue-800">📋 Missões do Oak</h2>
+              <div className="space-y-2">
                 {gameState.quests.map((q, i) => (
-                  <div key={q.id} className="border-2 border-gray-100 p-2 bg-gray-50 rounded-lg">
-                    <p className="font-bold text-[9px] mb-1">{q.desc}</p>
-                    <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden mb-2">
-                        <div className="bg-blue-400 h-full transition-all" style={{ width: `${Math.min((q.progress / q.target)*100, 100)}%` }}></div>
+                  <div key={q.id} className="border-2 border-gba-dark p-2 bg-white rounded flex flex-col justify-between">
+                    <p className="font-bold text-[9px] mb-2">{q.desc}</p>
+                    <div className="w-full hp-bar-container h-2 mb-2">
+                        <div className="bg-blue-500 h-full transition-all" style={{ width: `${Math.min((q.progress / q.target)*100, 100)}%` }}></div>
                     </div>
-                    <button onClick={(e) => claimQuest(i, e)} disabled={q.progress < q.target} className="w-full bg-green-500 text-white py-1 rounded font-bold text-[9px] hover:bg-green-600 disabled:bg-gray-300">
-                      {q.progress >= q.target ? `Coletar ₽${q.reward}` : `${q.progress} / ${q.target}`}
+                    <button onClick={(e) => claimQuest(i, e)} disabled={q.progress < q.target} className="bg-green-500 text-white py-1 border-b-2 border-gba-dark active:border-b-0 active:translate-y-[2px] disabled:opacity-50 disabled:bg-gray-400 cursor-pointer text-[9px]">
+                      {q.progress >= q.target ? `Coletar ₽${q.reward}` : `${q.progress}/${q.target}`}
                     </button>
                   </div>
                 ))}
@@ -689,39 +706,53 @@ export default function App() {
           )}
 
           {activeTab === 'progresso' && (
-            <div className="space-y-4">
-              <section className="gba-dialog p-4 bg-white rounded-lg border-2 border-gba-dark">
-                <h2 className="text-center font-bold border-b-2 mb-3 pb-1 uppercase">BerryDex</h2>
-                <div className="grid grid-cols-5 gap-1">
+            <>
+              <section className="gba-dialog p-4 bg-white/90 animate-[fadeIn_0.3s_ease-in-out]">
+                <h2 className="text-lg mb-4 border-b-2 border-gba-dark pb-2 text-center text-blue-800">📖 BerryDex & Maestria</h2>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                   {Object.values(BERRIES).map(berry => {
                     const totalHarvested = gameState.stats[berry.id] || 0;
                     const isDiscovered = totalHarvested > 0;
                     const masteryLvl = getMasteryLevel(totalHarvested);
+                    const speedBonus = Math.min(masteryLvl, 50);
+              
                     return (
-                      <div key={berry.id} className={`p-1 border rounded flex flex-col items-center ${isDiscovered ? 'bg-blue-50 border-blue-100' : 'bg-gray-100 opacity-30 grayscale'}`}>
+                      <div key={berry.id} className={`border-2 p-2 flex flex-col items-center rounded ${isDiscovered ? 'border-blue-300 bg-blue-50' : 'border-gray-300 bg-gray-100 grayscale opacity-50'}`}>
                         <img src={berry.sprite} alt={berry.name} className="w-8 h-8" style={{ imageRendering: 'pixelated' }}/>
-                        {isDiscovered && <span className="text-[7px] font-black text-blue-600">Lv.{masteryLvl}</span>}
+                        <span className="font-bold mt-1 text-[9px]">{isDiscovered ? berry.name : '???'}</span>
+                        {isDiscovered && (
+                          <>
+                            <span className="text-[8px] text-blue-600 font-bold mt-1">Lvl {masteryLvl}</span>
+                            <span className="text-[7px] text-green-600 mt-1">Tempo -{speedBonus}%</span>
+                            {masteryLvl >= 50 && <span className="text-[7px] text-yellow-600 font-bold">5% Instacrop</span>}
+                          </>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </section>
-
-              <section className="gba-dialog p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200">
-                <h2 className="text-center font-bold border-b-2 mb-2 pb-1 uppercase text-yellow-700">Conquistas</h2>
-                <div className="space-y-2">
+              
+              <section className="gba-dialog p-4 bg-yellow-50/90 border-yellow-600 animate-[fadeIn_0.3s_ease-in-out]">
+                <div className="flex justify-between items-center mb-4 border-b-2 border-yellow-600 pb-2">
+                    <h2 className="text-lg text-yellow-800">🏆 Conquistas</h2>
+                </div>
+                <span className="text-[9px] bg-yellow-200 text-yellow-800 px-2 py-1 rounded border border-yellow-600 font-bold block text-center mb-3">
+                    Bônus Global de Venda: +{Object.keys(gameState.achievements || {}).length * 5}%
+                </span>
+                <div className="grid grid-cols-1 gap-2">
                     {ACHIEVEMENTS.map(ach => {
                       const isUnlocked = gameState.achievements?.[ach.id];
                       return (
-                          <div key={ach.id} className={`p-2 border rounded-lg ${isUnlocked ? 'bg-white border-yellow-300' : 'bg-gray-50 opacity-40 grayscale'}`}>
-                            <p className="font-bold text-[9px]">{ach.name}</p>
-                            <p className="text-[7px] text-gray-500">{ach.desc}</p>
+                          <div key={ach.id} className={`p-2 border-2 rounded flex flex-col ${isUnlocked ? 'border-yellow-500 bg-yellow-100' : 'border-gray-300 bg-gray-100 opacity-60 grayscale'}`}>
+                            <span className="font-bold text-[10px] text-gba-dark">{ach.name}</span>
+                            <span className="text-[8px] text-gray-600 mt-1">{ach.desc}</span>
                           </div>
                       )
                     })}
                 </div>
               </section>
-            </div>
+            </>
           )}
         </div>
       </div>
