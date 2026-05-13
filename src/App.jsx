@@ -10,10 +10,11 @@ const BERRIES = {
 };
 
 const HELPERS = {
-  water: { id: 'water', basePrice: 50, stages: [ { name: "Squirtle", minLvl: 0, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png", effect: "Tempo -20%", mult: 0.8 }, { name: "Wartortle", minLvl: 10, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/8.png", effect: "Tempo -40%", mult: 0.6 }, { name: "Blastoise", minLvl: 25, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/9.png", effect: "Tempo -60%", mult: 0.4 } ] },
-  collector: { id: 'collector', basePrice: 1000, stages: [ { name: "Meowth", minLvl: 0, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/52.png", effect: "Colhe Automática", bonusChance: 0 }, { name: "Persian", minLvl: 15, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/53.png", effect: "Auto + 20% Chance 2x", bonusChance: 0.2 } ] },
-  fertilizer: { id: 'fertilizer', basePrice: 150, stages: [ { name: "Bulbasaur", minLvl: 0, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png", effect: "10% chance 2x", mult: 0.1 }, { name: "Ivysaur", minLvl: 10, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/2.png", effect: "25% chance 2x", mult: 0.25 }, { name: "Venusaur", minLvl: 25, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/3.png", effect: "50% chance 2x", mult: 0.5 } ] },
-  planter: { id: 'planter', basePrice: 500, stages: [ { name: "Cherubi", minLvl: 0, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/420.png", effect: "10% Auto-Replant", chance: 0.1 }, { name: "Cherrim", minLvl: 10, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/421.png", effect: "30% Auto-Replant", chance: 0.3 }, { name: "Celebi", minLvl: 25, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/251.png", effect: "100% Auto-Replant", chance: 1.0 } ] }
+  water: { id: 'water', basePrice: 50, stages: [ { name: "Squirtle", minLvl: 0, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png", effect: "Tempo -20%", mult: 0.8 }, { name: "Wartortle", minLvl: 16, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/8.png", effect: "Tempo -40%", mult: 0.6 }, { name: "Blastoise", minLvl: 36, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/9.png", effect: "Tempo -60%", mult: 0.4 } ] },
+  collector: { id: 'collector', basePrice: 1000, stages: [ { name: "Meowth", minLvl: 0, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/52.png", effect: "Colhe Automática", bonusChance: 0 }, { name: "Persian", minLvl: 16, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/53.png", effect: "Auto + 20% Chance 2x", bonusChance: 0.2 } ] },
+  fertilizer: { id: 'fertilizer', basePrice: 150, stages: [ { name: "Bulbasaur", minLvl: 0, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png", effect: "10% chance 2x", mult: 0.1 }, { name: "Ivysaur", minLvl: 16, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/2.png", effect: "25% chance 2x", mult: 0.25 }, { name: "Venusaur", minLvl: 36, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/3.png", effect: "50% chance 2x", mult: 0.5 } ] },
+  planter: { id: 'planter', basePrice: 400, stages: [ { name: "Cherubi", minLvl: 0, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/420.png", effect: "10% Auto-Replant", chance: 0.1 }, { name: "Cherrim", minLvl: 10, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/421.png", effect: "30% Auto-Replant", chance: 0.3 }, { name: "Celebi", minLvl: 36, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/251.png", effect: "100% Auto-Replant", chance: 1.0 } ] }
+  seller: { id: 'seller', basePrice: 450, stages: [ { name: "Ralts", minLvl: 0, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/280.png", effect: "Auto-Venda (x1)", mult: 1 }, { name: "Kirlia", minLvl: 16, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/281.png", effect: "Auto-Venda (x10)", mult: 10 }, { name: "Gardevoir", minLvl: 36, sprite: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/282.png", effect: "Auto-Venda (x30)", mult: 30 }]}
 };
 
 const KEY_ITEMS = {
@@ -69,7 +70,7 @@ const INITIAL_STATE = {
   money: 0, regionIndex: 0, unlockedBeds: 2,
   inventory: { oran: 0, pecha: 0, sitrus: 0, qualot: 0, enigma: 0 },
   stats: { oran: 0, pecha: 0, sitrus: 0, qualot: 0, enigma: 0, rocketsDefeated: 0 },
-  helpers: { water: 0, collector: 0, fertilizer: 0, planter: 0 },
+  helpers: { water: 0, collector: 0, fertilizer: 0, planter: 0, seller: 0 },
   beds: Array(12).fill({ isEmpty: true, berryId: null, progress: 0, isShiny: false }),
   tools: { wailmerPail: false, amuletCoin: false, machoBrace: false },
   pasture: {}, 
@@ -216,6 +217,37 @@ export default function App() {
                 newWild = { active: true, ...poke, timeLeft: 15, x: Math.floor(Math.random() * 80) + 10, y: Math.floor(Math.random() * 80) + 10 }; 
             }
         }
+        
+        // ---> LÓGICA DO NOVO AJUDANTE (AUTO-SELL) <---
+        const sellerLvl = prev.helpers?.seller || 0;
+        if (sellerLvl > 0) {
+            const sellerStage = getHelperStage('seller', sellerLvl);
+            // Quantidade vendida por segundo = Level do Ajudante * Multiplicador da Evolução
+            const sellLimit = sellerLvl * sellerStage.mult; 
+            
+            // Puxa todos os multiplicadores globais de preço
+            const regionBonus = 1 + (prev.regionIndex || 0); 
+            const amuletMult = prev.tools?.amuletCoin ? 1.5 : 1.0;
+            const achievBonus = 1 + (Object.keys(prev.achievements || {}).length * 0.05); 
+            const mewBonus = prev.pasture?.mew > 0 ? 1.10 : 1.0;
+
+            // Varre o inventário e vende até o limite do level dele
+            Object.keys(BERRIES).forEach(berryId => {
+                const qtyInInv = newInventory[berryId] || 0;
+                if (qtyInInv > 0) {
+                    const toSell = Math.min(qtyInInv, sellLimit);
+                    const dexBonus = 1 + (Math.floor((newStats[berryId] || 0) / 10) * 0.01);
+                    const unitValue = Math.floor(BERRIES[berryId].value * regionBonus * dexBonus * amuletMult * achievBonus * mewBonus);
+                    
+                    newMoney += (toSell * unitValue);
+                    newInventory[berryId] -= toSell;
+                    
+                    // Avança as quests de venda automaticamente também!
+                    newQuests = updateQuestsProgress(newQuests, 'sell', berryId, toSell);
+                }
+            });
+        }
+        // ---> FIM DA LÓGICA DO AUTO-SELL <---
 
         const stateForCheck = { ...prev, money: newMoney, stats: newStats };
         ACHIEVEMENTS.forEach(ach => {
