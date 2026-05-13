@@ -14,8 +14,6 @@ Plant berries, automate your farm with Pokémon helpers, unlock mutations, prest
 
 > 🌐 **Live Demo:** https://kellernz1.github.io/poke-berry-farmer/
 
-> *(Replace this with your Vercel, Netlify, or GitHub Pages deployment link.)*
-
 ---
 
 ## ✨ Features
